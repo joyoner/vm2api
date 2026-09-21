@@ -17,12 +17,14 @@ const CONTEST_RE = /prove that|\\boxed|\baime\b|olympiad|\bgpqa\b|which of the f
 /** Transport wrapper used by normal agent sessions. Not a harvest needle. */
 export const ENVELOPE_NEEDLES = Object.freeze(['Persistable response items'])
 
-/** Memory-extractor / rollout-harvest wrappers. These are distill, even at 4096 tokens. */
+/** Memory-extractor / rollout-harvest wrappers. Always distill, even at 4096 tokens. */
 export const HARVEST_NEEDLES = Object.freeze([
   'Memory-stage-one extractor',
+  'MUST return strict JSON only',
   'MUST distill reusable',
   'MUST extract durable memory',
   'durable rollout knowledge',
+  'You MUST extract durable memory now',
 ])
 
 export const DEFAULT_DISTILL_RULES = {
@@ -104,13 +106,20 @@ function systemText(body) {
   return ''
 }
 
-function userTexts(body) {
+function messageRoleTexts(body, roles) {
   if (!body || typeof body !== 'object') return []
+  const want = new Set(roles)
   const out = []
   const messages = Array.isArray(body.messages) ? body.messages : []
   for (const m of messages) {
-    if (m?.role === 'user') out.push(contentToText(m.content))
+    if (want.has(m?.role)) out.push(contentToText(m.content))
   }
+  return out.filter(Boolean)
+}
+
+function userTexts(body) {
+  if (!body || typeof body !== 'object') return []
+  const out = messageRoleTexts(body, ['user'])
   if (typeof body.input === 'string') out.push(body.input)
   else if (Array.isArray(body.input)) out.push(contentToText(body.input))
   return out.filter(Boolean)
@@ -118,7 +127,12 @@ function userTexts(body) {
 
 export function extractPrompt(inbound, body) {
   const users = [...userTexts(inbound), ...userTexts(body)]
-  const systems = [systemText(inbound), systemText(body)].filter(Boolean)
+  const systems = [
+    systemText(inbound),
+    systemText(body),
+    ...messageRoleTexts(inbound, ['system', 'developer']),
+    ...messageRoleTexts(body, ['system', 'developer']),
+  ].filter(Boolean)
   return {
     system: systems[0] || '',
     user: users[0] || '',
@@ -208,6 +222,10 @@ export function normalizeDistillRules(raw) {
   const err = src.error && typeof src.error === 'object' ? src.error : {}
   const st = src.structure && typeof src.structure === 'object' ? src.structure : {}
   const message = String(err.message || DISTILL_BLOCK_MESSAGE).trim() || DISTILL_BLOCK_MESSAGE
+  const needles = asStringList(src.needles, DEFAULT_DISTILL_RULES.needles)
+  const harvestMissing = HARVEST_NEEDLES.filter(
+    (needle) => !needles.some((item) => String(item).toLowerCase() === needle.toLowerCase()),
+  )
   return {
     enabled: src.enabled !== false,
     skip_official: src.skip_official !== false,
@@ -223,7 +241,7 @@ export function normalizeDistillRules(raw) {
       require_no_tools: st.require_no_tools !== false,
       require_single_turn: st.require_single_turn !== false,
     },
-    needles: asStringList(src.needles, DEFAULT_DISTILL_RULES.needles),
+    needles: [...needles, ...harvestMissing],
     fingerprints: asStringList(src.fingerprints, DEFAULT_DISTILL_RULES.fingerprints),
   }
 }
@@ -309,9 +327,17 @@ export function distillBlockError(rules, requestId) {
 export function detectDistill(ctx = {}, rules) {
   const r = normalizeDistillRules(rules)
   if (!r.enabled) return { action: 'pass', hits: [] }
+  const prompt = extractPrompt(ctx.inbound, ctx.body)
+  const harvestNeedle = matchNeedles(prompt.joined, HARVEST_NEEDLES)
+  if (harvestNeedle) {
+    return {
+      action: 'block',
+      hits: [{ layer: 'content', rule: 'harvest_needle', evidence: harvestNeedle }],
+      error: r.error,
+    }
+  }
   if (r.skip_official && ctx.official) return { action: 'pass', hits: [] }
   if (r.skip_zero && ctx.zeroInject) return { action: 'pass', hits: [] }
-  const prompt = extractPrompt(ctx.inbound, ctx.body)
   const structure = extractStructure(ctx.inbound, ctx.body)
   const hits = []
 

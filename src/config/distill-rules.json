@@ -26,9 +26,11 @@
     "as an internal monologue",
     "Please reason step by step, and put your final answer within \\boxed{}",
     "Memory-stage-one extractor",
+    "MUST return strict JSON only",
     "MUST distill reusable",
     "MUST extract durable memory",
     "durable rollout knowledge",
+    "You MUST extract durable memory now",
     "Respond in the following format: <think>"
   ],
   "fingerprints": [

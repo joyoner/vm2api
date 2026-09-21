@@ -760,6 +760,7 @@ export function createHandleProtocol(deps) {
               repaired,
               cacheBreakpoints,
               cacheControlLimit: Number(getRouting()?.compatibility?.cache_control_limit) || 4,
+              cacheTtl,
               unofficial: !officialTraffic,
             })
             hopBody = await materializeRemoteImageSources(hopBody)
@@ -834,6 +835,7 @@ export function createHandleProtocol(deps) {
               signal,
               deliveryMode: attemptDelivery,
               toolNames: attemptMeta?.toolNames || {},
+              cacheTtl,
               want1m,
               routing: getRouting(),
               noGoFallback: !!pinVmId,
@@ -861,6 +863,7 @@ export function createHandleProtocol(deps) {
           try {
             return await dispatchStreamInference({
               exec: candidate.exec,
+              cacheTtl,
               body,
               reqHeaders: req.headers,
               timeoutMs: cfg.limits.upstream_timeout_ms,

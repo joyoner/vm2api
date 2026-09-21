@@ -272,6 +272,48 @@ test('cli-hop rewrite keeps 5m leftover so wrap markers cannot violate TTL order
   assert.equal(body.messages[4].content[0].cache_control, undefined)
 })
 
+test('cli-hop uses resolved 1h TTL for the Node-owned boundary', () => {
+  const body = prepareCliHopBody(
+    {
+      model: 'claude-sonnet-5',
+      max_tokens: 256,
+      tools: [{ name: 'Read', cache_control: { type: 'ephemeral', ttl: '5m' } }],
+      system: [{ type: 'text', text: 'caller system', cache_control: { type: 'ephemeral', ttl: '5m' } }],
+      messages: [
+        { role: 'user', content: 'u1' },
+        { role: 'assistant', content: 'a1' },
+        { role: 'user', content: 'u2' },
+        { role: 'assistant', content: 'a2' },
+        { role: 'user', content: 'u3' },
+      ],
+    },
+    { cacheTtl: '1h' },
+  )
+  assert.equal(body.tools[0].cache_control, undefined)
+  assert.equal(body.system[0].cache_control, undefined)
+  assert.deepEqual(body.messages[2].content[0].cache_control, { type: 'ephemeral', ttl: '1h' })
+  assert.equal(body.messages[4].content[0].cache_control, undefined)
+})
+
+test('official cli-hop preserves client-owned breakpoints when cache TTL is null', () => {
+  const body = prepareCliHopBody(
+    {
+      model: 'claude-sonnet-5',
+      max_tokens: 256,
+      system: [{ type: 'text', text: CRS_OFFICIAL_AGENT_PROMPT, cache_control: { type: 'ephemeral', ttl: '1h' } }],
+      messages: [
+        { role: 'user', content: [{ type: 'text', text: 'u1', cache_control: { type: 'ephemeral', ttl: '1h' } }] },
+        { role: 'assistant', content: 'a1' },
+        { role: 'user', content: [{ type: 'text', text: 'u2', cache_control: { type: 'ephemeral', ttl: '5m' } }] },
+      ],
+    },
+    { cacheTtl: null },
+  )
+  assert.deepEqual(body.system[0].cache_control, { type: 'ephemeral', ttl: '1h' })
+  assert.deepEqual(body.messages[0].content[0].cache_control, { type: 'ephemeral', ttl: '1h' })
+  assert.deepEqual(body.messages[2].content[0].cache_control, { type: 'ephemeral', ttl: '5m' })
+})
+
 test('cli-hop rewrite keeps sub2api penultimate user after dropping CLI last-user stamp', () => {
   const body = prepareCliHopBody({
     model: 'claude-sonnet-5',

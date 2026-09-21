@@ -251,13 +251,15 @@ export function finalizeWorkerPayload({ body, reqHeaders, exec, identity, want1m
   }
 }
 
-function workerEnvelope({ body, reqHeaders, exec, identity, stream, deliveryMode, want1m = false }) {
+function workerEnvelope({ body, reqHeaders, exec, identity, stream, deliveryMode, want1m = false, cacheTtl = null }) {
   const finalized = finalizeWorkerPayload({ body, reqHeaders, exec, identity, want1m })
   const envelope = {
     body: finalized.body,
     headers: finalized.headers,
     stream: !!stream,
     delivery_mode: deliveryMode || 'realtime',
+    preserve_cache_breakpoints: cacheTtl == null,
+    cache_ttl: cacheTtl == null ? null : String(cacheTtl),
   }
   dumpSessionEnvelope(envelope)
   return envelope
@@ -280,6 +282,7 @@ export async function callGoWorker({
   identity = null,
   signal,
   want1m = false,
+  cacheTtl = null,
   requestPath = '/internal/v1/messages',
   envelope = null,
 } = {}) {
@@ -300,7 +303,7 @@ export async function callGoWorker({
     const response = await workerRequest(exec, {
       method: 'POST',
       requestPath,
-      body: envelope || workerEnvelope({ body, reqHeaders, exec, identity, stream: false, want1m }),
+      body: envelope || workerEnvelope({ body, reqHeaders, exec, identity, stream: false, want1m, cacheTtl }),
       signal,
       timeoutMs,
     })
@@ -351,6 +354,7 @@ export async function streamGoWorker({
   onEvent,
   onCommit,
   want1m = false,
+  cacheTtl = null,
   requestPath = '/internal/v1/messages',
   envelope = null,
 } = {}) {
@@ -428,7 +432,8 @@ export async function streamGoWorker({
     const response = await workerRequest(exec, {
       method: 'POST',
       requestPath,
-      body: envelope || workerEnvelope({ body, reqHeaders, exec, identity, stream: true, deliveryMode, want1m }),
+      body:
+        envelope || workerEnvelope({ body, reqHeaders, exec, identity, stream: true, deliveryMode, want1m, cacheTtl }),
       signal,
       timeoutMs,
       timeoutMode: 'first-byte',

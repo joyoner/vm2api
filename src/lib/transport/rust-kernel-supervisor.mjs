@@ -14,6 +14,7 @@ import {
   rustKernelBusy,
 } from './rust-kernel-client.mjs'
 import { OFFICIAL_CLI_VERSION } from '../identity/vm-identity.mjs'
+import { cacheTtlFromRouting, normalizeCacheTtl } from '../protocol/cache-ttl.mjs'
 import { setVmSchedulable } from '../vm/vm-registry.mjs'
 import { KERNEL_NATIVE_SLOT_COUNT, resolveCliSystemLayout } from '../vm/slot-engine.mjs'
 import { ensureOfficialCredentialLink, slotUidGidFromHomeDir } from '../oauth/oauth-credentials.mjs'
@@ -499,6 +500,18 @@ export function stopAllRustKernels() {
   starts.clear()
   return { ok: true, stopped: 0, cancelled }
 }
+function writeKernelJsonAtomically(configPath, config) {
+  const tempPath = `${configPath}.${process.pid}.${Date.now()}.tmp`
+  try {
+    fs.writeFileSync(tempPath, JSON.stringify(config, null, 2) + '\n', { mode: 0o600 })
+    fs.renameSync(tempPath, configPath)
+  } catch (error) {
+    try {
+      fs.rmSync(tempPath, { force: true })
+    } catch {}
+    throw error
+  }
+}
 
 export function writeKernelConfig(
   projectRoot,
@@ -527,6 +540,8 @@ export function writeKernelConfig(
   const testEndpoints = process.env.KIN_KERNEL_TEST_ENDPOINTS === '1'
   const claudeBin = String(process.env.KIN_CLAUDE_BIN || '').trim() || CONTAINER_CLAUDE_BIN
   const tz = String(timezone || vm.timezone || previous.timezone || '').trim()
+  const defaultCacheTtl = routing != null ? cacheTtlFromRouting(routing) : normalizeCacheTtl(previous.default_cache_ttl)
+
   const config = {
     vm_id: vm.id,
     socket_path: '/run/kin/kernel.sock',
@@ -549,6 +564,7 @@ export function writeKernelConfig(
     slots_per_worker: wrapSlotCount(vm, routing || {}),
     system_layout: resolveCliSystemLayout(vm, routing || {}),
     cli_version: OFFICIAL_CLI_VERSION,
+    default_cache_ttl: defaultCacheTtl,
   }
 
   if (tz) config.timezone = tz
@@ -558,6 +574,6 @@ export function writeKernelConfig(
     if (anthropicBaseUrl) config.anthropic_base_url = anthropicBaseUrl
     if (oauthTokenUrl) config.oauth_token_url = oauthTokenUrl
   }
-  fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', { mode: 0o600 })
+  writeKernelJsonAtomically(configPath, config)
   return { runDir, socketPath, configPath, credentialPath, tokenPath, provider: config.provider }
 }

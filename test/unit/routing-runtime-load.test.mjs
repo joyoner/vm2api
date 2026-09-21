@@ -117,3 +117,40 @@ test('persistRoutingPatch reconciles inherited Claude session slots and preserve
     fs.rmSync(root, { recursive: true, force: true })
   }
 })
+
+test('persistRoutingPatch writes compatibility cache_ttl into Claude kernel configs', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kin-routing-cache-ttl-'))
+  const vms = path.join(root, 'vms')
+  const routingFile = path.join(root, 'routing.json')
+  fs.mkdirSync(vms, { recursive: true })
+  fs.writeFileSync(path.join(vms, 'vm-claude.json'), JSON.stringify({ id: 'vm-claude', claude: {} }))
+  fs.writeFileSync(
+    path.join(vms, 'vm-codex.json'),
+    JSON.stringify({ id: 'vm-codex', platform: 'openai', family: 'codex', codex: {} }),
+  )
+  const routingConfig = { compatibility: { cache_ttl: '1h' }, concurrency: {}, tiers: {} }
+  fs.writeFileSync(routingFile, JSON.stringify(routingConfig))
+  try {
+    const runtime = createRoutingRuntime({
+      cfg: { paths: { project: root } },
+      routingConfigPath: routingFile,
+      routingConfig,
+      stickyRouter: { reloadConfig() {} },
+      accountQuota: {
+        reloadConfig() {},
+        applyTierConcurrency() {},
+        applyTierRpm() {},
+        repo: { get: () => null },
+      },
+      requestLog: { setConfig() {} },
+    })
+
+    runtime.persistRoutingPatch({ compatibility: { cache_ttl: '5m' } })
+
+    const kernel = JSON.parse(fs.readFileSync(path.join(vms, 'vm-claude', 'run', 'kernel.json'), 'utf8'))
+    assert.equal(kernel.default_cache_ttl, '5m')
+    assert.equal(fs.existsSync(path.join(vms, 'vm-codex', 'run', 'kernel.json')), false)
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true })
+  }
+})

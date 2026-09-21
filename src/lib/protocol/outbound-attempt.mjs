@@ -38,6 +38,7 @@ import {
   applyCacheBreakpoints,
   enforceCacheTtlOrder,
   normalizeCacheBreakpoints,
+  normalizeCacheTtl,
   stripIllegalCacheControlFields,
 } from './cache-ttl.mjs'
 import { apiKeyBetaHeader, setupTokenBetaHeader } from './claude-code-betas.mjs'
@@ -81,7 +82,8 @@ export const CLI_HOP_CACHE_BREAKPOINTS = Object.freeze({
   messages: 'rewrite',
 })
 
-/** Wrap CLI and kernel emit ttl-less ephemeral markers, which Anthropic treats as 5m. */
+/** Direct utility callers use the legacy 5m policy; production passes either
+ * the resolved TTL or null for official Claude Code traffic. */
 export const CLI_HOP_CACHE_TTL = '5m'
 
 function dropNodeCacheControl(node) {
@@ -142,6 +144,7 @@ export function prepareCliHopBody(
     repaired = false,
     cacheBreakpoints = CLI_HOP_CACHE_BREAKPOINTS,
     cacheControlLimit = 4,
+    cacheTtl = CLI_HOP_CACHE_TTL,
     unofficial: _unofficial = false,
   } = {},
 ) {
@@ -161,14 +164,15 @@ export function prepareCliHopBody(
   }
   body = stripInvalidThinkingBlocks(body)
   body = alignSamplingWithThinking(body)
+  if (cacheTtl == null) return body
+  const ttl = normalizeCacheTtl(cacheTtl)
   body = stripIllegalCacheControlFields(body)
-  // Node rewrites last + penultimate user, then removes the current tail so
-  // the kernel can restamp it after transport conversion. Keep every Node
-  // marker at 5m because wrap-owned tools/system markers are ttl-less (=5m).
+  // Node owns the stable previous-user boundary; the kernel receives the same
+  // resolved TTL and owns the current tail plus wrap-owned markers.
   if (cacheBreakpoints) {
     const cfg = normalizeCacheBreakpoints(cacheBreakpoints)
     body = applyCacheBreakpoints(body, {
-      ttl: CLI_HOP_CACHE_TTL,
+      ttl,
       config: {
         enabled: cfg.enabled,
         preserve_client: cfg.preserve_client,
@@ -181,7 +185,7 @@ export function prepareCliHopBody(
   }
   body = dropCliOwnedBreakpoints(body)
   body = dropLastMessageBreakpoint(body)
-  body = enforceCacheTtlOrder(body)
+  body = enforceCacheTtlOrder(body, { honorHour: ttl === '1h' })
   enforceCacheLimit(body, cacheControlLimit)
   return body
 }

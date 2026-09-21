@@ -70,6 +70,8 @@ unixTest('callGoWorker sends envelope over authenticated Unix socket', async () 
     for await (const chunk of req) chunks.push(chunk)
     const envelope = JSON.parse(Buffer.concat(chunks).toString('utf8'))
     assert.equal(envelope.body.model, 'claude-test')
+    assert.equal(envelope.cache_ttl, '1h')
+    assert.equal(envelope.preserve_cache_breakpoints, false)
     assert.equal(envelope.stream, false)
     assert.match(envelope.headers['user-agent'], /^claude-cli\//)
     res.setHeader('content-type', 'application/json')
@@ -88,11 +90,34 @@ unixTest('callGoWorker sends envelope over authenticated Unix socket', async () 
     const result = await callGoWorker({
       exec: fx.exec,
       body: { model: 'claude-test', messages: [{ role: 'user', content: 'hi' }] },
+      cacheTtl: '1h',
       reqHeaders: { 'user-agent': 'test-client' },
     })
     assert.equal(result.ok, true)
     assert.equal(result.terminalState, 'verified')
     assert.equal(result.body.content[0].text, 'ok')
+  } finally {
+    await fx.close()
+  }
+})
+
+unixTest('callGoWorker marks null TTL as client-owned cache breakpoints', async () => {
+  const fx = await fixture(async (req, res) => {
+    const chunks = []
+    for await (const chunk of req) chunks.push(chunk)
+    const envelope = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+    assert.equal(envelope.cache_ttl, null)
+    assert.equal(envelope.preserve_cache_breakpoints, true)
+    res.setHeader('content-type', 'application/json')
+    res.end(JSON.stringify({ type: 'message', role: 'assistant', content: [{ type: 'text', text: 'ok' }] }))
+  })
+  try {
+    const result = await callGoWorker({
+      exec: fx.exec,
+      body: { model: 'claude-test', messages: [{ role: 'user', content: 'hi' }] },
+      cacheTtl: null,
+    })
+    assert.equal(result.ok, true)
   } finally {
     await fx.close()
   }

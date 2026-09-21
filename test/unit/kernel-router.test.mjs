@@ -564,6 +564,7 @@ test('writeKernelConfig separates container paths from host socket paths', () =>
   assert.equal(doc.claude_bin, '/home/kincli/.kin/cli-node')
   assert.equal(doc.https_proxy, undefined)
   assert.equal(doc.slots_per_worker, WRAP_SLOT_MAX)
+  assert.equal(doc.default_cache_ttl, '1h')
   assert.match(written.socketPath.replace(/\\/g, '/'), /vms\/vm-09\/run\/kernel\.sock$/)
   assert.equal(fs.readFileSync(written.tokenPath, 'utf8').trim(), 'tok')
   const exec = { vmId: 'vm-09', homeDir: path.join(root, 'vms', 'vm-09', 'cli-home'), vm: { id: 'vm-09' } }
@@ -581,6 +582,7 @@ test('writeKernelConfig cli-hop writes local_cli without secrets', () => {
       proxyUrl: 'socks5h://127.0.0.1:1080',
       proxyRequired: true,
       timezone: 'America/New_York',
+      routing: { compatibility: { cache_ttl: '5m' } },
     },
   )
   const doc = JSON.parse(fs.readFileSync(written.configPath, 'utf8'))
@@ -591,6 +593,7 @@ test('writeKernelConfig cli-hop writes local_cli without secrets', () => {
   assert.equal(doc.slots_per_worker, WRAP_SLOT_MAX)
   assert.equal(doc.system_layout, 'identity')
   assert.equal(doc.cli_version, OFFICIAL_CLI_VERSION)
+  assert.equal(doc.default_cache_ttl, '5m')
   assert.equal(doc.timezone, 'America/New_York')
   assert.equal(doc.proxy_url, '')
   assert.equal(doc.proxy_required, false)

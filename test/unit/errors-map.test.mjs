@@ -196,7 +196,7 @@ test('wrap Connection error is not upstream', () => {
   assert.notEqual(mapped.body.error.type, 'upstream_error')
 })
 
-test('Claude Code AUP wrap error is 403 content_filter, not 502', () => {
+test('Claude Code AUP wrap error stays 502, not content_filter 403', () => {
   const msg =
     'provider error: provider error: API Error: Claude Code is unable to respond to this request, which appears to violate our Usage Policy (https://www.anthropic.com/legal/aup). Try rephrasing the request'
   assert.equal(isUsagePolicyErrorMessage(msg), true)
@@ -204,9 +204,8 @@ test('Claude Code AUP wrap error is 403 content_filter, not 502', () => {
     type: 'error',
     error: { type: 'api_error', message: msg },
   })
-  assert.equal(mapped.status, 403)
-  assert.equal(mapped.body.error.type, 'permission_error')
-  assert.equal(mapped.body.error.code, 'content_filter_refusal')
+  assert.equal(mapped.status, 502)
+  assert.notEqual(mapped.body.error.code, 'content_filter_refusal')
 })
 
 test('kernel slot_busy is overloaded, not upstream', () => {

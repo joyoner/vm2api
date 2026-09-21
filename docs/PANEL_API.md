@@ -140,7 +140,7 @@
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET/PUT | `/refusal-guards` | 上游 AUP / `stop_reason=refusal` 指纹缓存。命中后 HTTP 403，`code=refusal_guard`，不 hop |
+| GET/PUT | `/refusal-guards` | 仅缓存 `stop_reason=refusal` / refusal 块 / `finalState=content_filter`。命中后 HTTP 403，`code=refusal_guard`，不 hop。wrap `Usage Policy` 文案和信封 JSON 不会入缓存 |
 | DELETE | `/refusal-guards/:fingerprint` | 删除一条 64 位 hex 指纹 |
 | DELETE | `/refusal-guards` | 须 `{ "confirm": true }` 清空 |
 

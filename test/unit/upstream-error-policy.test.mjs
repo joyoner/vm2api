@@ -364,7 +364,7 @@ test('200 refusal with empty visible output is content_filter, not success', () 
   assert.equal(policy.reason, 'content_filter_refusal')
 })
 
-test('wrap Usage Policy 502 stops the request and does not rotate', () => {
+test('wrap Usage Policy 502 failovers like other 502s and does not cache as refusal', () => {
   const policy = classifyUpstreamResult({
     ok: false,
     status: 502,
@@ -378,10 +378,9 @@ test('wrap Usage Policy 502 stops the request and does not rotate', () => {
       },
     },
   })
-  assert.equal(policy.scope, 'request')
-  assert.equal(policy.action, 'stop')
-  assert.equal(policy.reason, 'content_filter_refusal')
-  assert.equal(shouldContinue(policy), false)
+  assert.equal(policy.action, 'continue')
+  assert.notEqual(policy.reason, 'content_filter_refusal')
+  assert.equal(shouldContinue(policy), true)
 })
 
 test('assistant prefill 400 is repairable', () => {

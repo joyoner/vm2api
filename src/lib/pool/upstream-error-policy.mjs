@@ -5,7 +5,6 @@ import {
   assistantVisibleOutput,
   isCompleteAssistantMessage,
   isIncompleteAssistantMessage,
-  isUsagePolicyErrorMessage,
   isWrapConnectionError,
 } from '../core/errors.mjs'
 import { parseResetMs } from './quota-window.mjs'
@@ -207,11 +206,7 @@ function claudeHasVisibleOutput(body) {
 
 /** 200 + stop_reason=refusal with no visible text — not a successful empty reply. */
 function isContentFilterRefusal(result = {}) {
-  if (isSilentClaudeRefusal(result)) return true
-  const hay = [resultErrorCode(result), bodyMessage(result.body), result?.body?.error?.code, result?.error]
-    .filter(Boolean)
-    .join('\n')
-  return isUsagePolicyErrorMessage(hay)
+  return isSilentClaudeRefusal(result)
 }
 
 export function isSilentClaudeRefusal(result = {}) {

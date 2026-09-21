@@ -318,7 +318,7 @@ export function mapUpstreamError(status, body, headers = {}) {
   }
   const request_id =
     body?.error?.request_id || body?.request_id || headers['request-id'] || headers['x-request-id'] || null
-  if (inboundCode === ErrorCode.CONTENT_FILTER_REFUSAL || isUsagePolicyErrorMessage(msg)) {
+  if (inboundCode === ErrorCode.CONTENT_FILTER_REFUSAL) {
     return makeError({
       type: ErrorType.PERMISSION,
       code: ErrorCode.CONTENT_FILTER_REFUSAL,

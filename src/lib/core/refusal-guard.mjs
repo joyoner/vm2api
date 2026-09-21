@@ -1,9 +1,14 @@
 /**
- * Persist upstream AUP / content-filter refusals and short-circuit repeats.
+ * Persist upstream content-filter refusals and short-circuit repeats.
  * Fingerprint is model + normalized system/user/tool names (not stream/max_tokens).
+ *
+ * Wrap "Usage Policy" text is not a cacheable refusal. HostDzire 1.3.8 stored
+ * 262 envelope sessions that way (normal coding prompts, hit_count=0) because
+ * persistable JSON changes every turn. Stripping that JSON would 403 later
+ * real turns of the same Claude Code session.
  */
 import { createHash } from 'node:crypto'
-import { ErrorType, ErrorCode, makeError, isUsagePolicyErrorMessage } from './errors.mjs'
+import { ErrorType, ErrorCode, makeError } from './errors.mjs'
 import { extractPrompt, normalizeText } from './distill-detect.mjs'
 
 export const REFUSAL_GUARD_MESSAGE =
@@ -25,22 +30,12 @@ export function isRefusalGuardEnabled(readSetting) {
   return true
 }
 
-const REFUSAL_HAY = /stop_reason[=:]?\s*refusal/i
-
 export function toolNamesOf(body) {
   if (!Array.isArray(body?.tools)) return []
   return body.tools
     .map((t) => String(t?.name || '').trim())
     .filter(Boolean)
     .sort()
-}
-
-export function envelopeStablePrompt(text = '') {
-  return normalizeText(
-    String(text || '')
-      .replace(/thread_id:\s*[0-9a-f-]{8,}/gi, 'thread_id:')
-      .replace(/Persistable response items \(JSON\):\s*\[[\s\S]*/i, 'Persistable response items (JSON):'),
-  )
 }
 
 export function refusalFingerprint(body = {}, inbound = body) {
@@ -50,7 +45,7 @@ export function refusalFingerprint(body = {}, inbound = body) {
     .toLowerCase()
   const payload = {
     model,
-    prompt: envelopeStablePrompt(prompt.joined),
+    prompt: normalizeText(prompt.joined),
     tools: toolNamesOf(body).length ? toolNamesOf(body) : toolNamesOf(inbound),
   }
   return createHash('sha256').update(JSON.stringify(payload)).digest('hex')
@@ -68,17 +63,13 @@ export function isUpstreamRefusal(result = {}, extra = {}) {
   if (result?.finalState === 'content_filter') return true
   const stop = String(result?.stopReason || result?.body?.stop_reason || extra.stop_reason || '')
   if (stop === 'refusal') return true
-  const hay = [
-    extra.error_message,
-    extra.error_code,
-    result?.body?.error?.message,
-    result?.body?.error?.code,
-    typeof result?.error === 'string' ? result.error : result?.error?.message,
-    result?.finalState,
-  ]
-    .filter(Boolean)
-    .join('\n')
-  return isUsagePolicyErrorMessage(hay) || REFUSAL_HAY.test(hay)
+  const blocks = result?.body?.content
+  if (Array.isArray(blocks)) {
+    for (const block of blocks) {
+      if (block?.type === 'refusal' && String(block.refusal || block.text || '').trim()) return true
+    }
+  }
+  return false
 }
 
 export function refusalGuardError(requestId) {

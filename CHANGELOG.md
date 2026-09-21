@@ -4,8 +4,8 @@
 
 - `VERSION` 成为唯一应用版本源；控制台从运行态 `/api/panel/me` 显示版本，Release 校验 tag，HostDzire 打包自动重建前端，避免旧构建版本漂移
 - 蒸馏拦截恢复 memory-stage-one / MUST distill 收割针，4096 tokens 的信封收割不再打到 wrap 变 AUP 502；`Persistable response items` 仍不是针
-- Claude Code Usage Policy 拒答映射为 403 `content_filter_refusal`，failover 不再当 502 换号重试
-- 拒答指纹忽略 `thread_id` 和信封 JSON 正文，同一收割模式命中 `refusal_guard`
+- 拒答缓存只记 `stop_reason=refusal` / `content_filter` / refusal 块；wrap `Usage Policy` 文案不再当拒答，也不再剥信封 JSON 指纹（HostDzire 262 条全是正常信封会话误入，hit_count=0）
+- wrap Usage Policy 502 仍可 failover，不再映射成 403 `content_filter_refusal` 停换号
 
 ## 1.3.8 — 2026-09-21
 

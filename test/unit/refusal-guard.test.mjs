@@ -34,6 +34,18 @@ test('fingerprint ignores stream and max_tokens, includes model', () => {
   assert.notEqual(a, c)
 })
 
+test('envelope harvest fingerprints ignore thread_id and persistable JSON body', () => {
+  const a = refusalFingerprint(
+    body('thread_id: 01a057ba-d606-7255-a932-a2cfad833afe\n\nPersistable response items (JSON):\n[{"role":"user"}]'),
+  )
+  const b = refusalFingerprint(
+    body(
+      'thread_id: 01a0bb2c-a363-7707-8691-ba523befae35\n\nPersistable response items (JSON):\n[{"role":"assistant"}]',
+    ),
+  )
+  assert.equal(a, b)
+})
+
 test('AUP and stop_reason=refusal count as upstream refusal; distill does not', () => {
   assert.equal(
     isUpstreamRefusal({

@@ -3,6 +3,9 @@
 ## Unreleased
 
 - `VERSION` 成为唯一应用版本源；控制台从运行态 `/api/panel/me` 显示版本，Release 校验 tag，HostDzire 打包自动重建前端，避免旧构建版本漂移
+- 蒸馏拦截恢复 memory-stage-one / MUST distill 收割针，4096 tokens 的信封收割不再打到 wrap 变 AUP 502；`Persistable response items` 仍不是针
+- Claude Code Usage Policy 拒答映射为 403 `content_filter_refusal`，failover 不再当 502 换号重试
+- 拒答指纹忽略 `thread_id` 和信封 JSON 正文，同一收割模式命中 `refusal_guard`
 
 ## 1.3.8 — 2026-09-21
 

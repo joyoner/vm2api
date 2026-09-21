@@ -5,6 +5,7 @@ import {
   assistantVisibleOutput,
   isCompleteAssistantMessage,
   isIncompleteAssistantMessage,
+  isUsagePolicyErrorMessage,
   isWrapConnectionError,
 } from '../core/errors.mjs'
 import { parseResetMs } from './quota-window.mjs'
@@ -205,6 +206,14 @@ function claudeHasVisibleOutput(body) {
 }
 
 /** 200 + stop_reason=refusal with no visible text — not a successful empty reply. */
+function isContentFilterRefusal(result = {}) {
+  if (isSilentClaudeRefusal(result)) return true
+  const hay = [resultErrorCode(result), bodyMessage(result.body), result?.body?.error?.code, result?.error]
+    .filter(Boolean)
+    .join('\n')
+  return isUsagePolicyErrorMessage(hay)
+}
+
 export function isSilentClaudeRefusal(result = {}) {
   if (claudeStopReasonOf(result) !== 'refusal') return false
   return !claudeHasVisibleOutput(result.body)
@@ -233,7 +242,7 @@ export function classifyUpstreamResult(
     usage = null,
   } = {},
 ) {
-  if (isSilentClaudeRefusal(result) && !result.committed) {
+  if (isContentFilterRefusal(result) && !result.committed) {
     return { scope: 'request', action: 'stop', reason: 'content_filter_refusal', cooldownUntil: null }
   }
   const completeAssistant = isCompleteAssistantMessage(result)

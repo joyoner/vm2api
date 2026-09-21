@@ -3,7 +3,7 @@
  * Fingerprint is model + normalized system/user/tool names (not stream/max_tokens).
  */
 import { createHash } from 'node:crypto'
-import { ErrorType, ErrorCode, makeError } from './errors.mjs'
+import { ErrorType, ErrorCode, makeError, isUsagePolicyErrorMessage } from './errors.mjs'
 import { extractPrompt, normalizeText } from './distill-detect.mjs'
 
 export const REFUSAL_GUARD_MESSAGE =
@@ -25,8 +25,7 @@ export function isRefusalGuardEnabled(readSetting) {
   return true
 }
 
-const REFUSAL_HAY =
-  /usage policy|legal\/aup|unable to respond to this request|violate our usage|content_filter_refusal|stop_reason[=:]?\s*refusal/i
+const REFUSAL_HAY = /stop_reason[=:]?\s*refusal/i
 
 export function toolNamesOf(body) {
   if (!Array.isArray(body?.tools)) return []
@@ -36,6 +35,14 @@ export function toolNamesOf(body) {
     .sort()
 }
 
+export function envelopeStablePrompt(text = '') {
+  return normalizeText(
+    String(text || '')
+      .replace(/thread_id:\s*[0-9a-f-]{8,}/gi, 'thread_id:')
+      .replace(/Persistable response items \(JSON\):\s*\[[\s\S]*/i, 'Persistable response items (JSON):'),
+  )
+}
+
 export function refusalFingerprint(body = {}, inbound = body) {
   const prompt = extractPrompt(inbound, body)
   const model = String(body?.model || inbound?.model || '')
@@ -43,7 +50,7 @@ export function refusalFingerprint(body = {}, inbound = body) {
     .toLowerCase()
   const payload = {
     model,
-    prompt: normalizeText(prompt.joined),
+    prompt: envelopeStablePrompt(prompt.joined),
     tools: toolNamesOf(body).length ? toolNamesOf(body) : toolNamesOf(inbound),
   }
   return createHash('sha256').update(JSON.stringify(payload)).digest('hex')
@@ -71,7 +78,7 @@ export function isUpstreamRefusal(result = {}, extra = {}) {
   ]
     .filter(Boolean)
     .join('\n')
-  return REFUSAL_HAY.test(hay)
+  return isUsagePolicyErrorMessage(hay) || REFUSAL_HAY.test(hay)
 }
 
 export function refusalGuardError(requestId) {

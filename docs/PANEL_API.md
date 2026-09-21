@@ -134,7 +134,7 @@
 |------|------|------|
 | GET/PUT | `/distill` | 协议入口蒸馏拦截。命中后 HTTP 403，`code=distill_blocked`，默认文案 `不允许蒸馏`，不 hop 凭证 |
 
-`PUT` 热更新 `src/config/distill-rules.json`。字段：`enabled`、`skip_official`（官方 Claude Code 放行）、`skip_zero`（`persona_preset/inject=zero` 放行）、`error.{status,type,code,message}`、`needles[]`、`fingerprints[]`、`structure.{min_max_tokens,require_no_tools,require_single_turn}`。仅 admin。
+`PUT` 热更新 `src/config/distill-rules.json`。字段：`enabled`、`skip_official`（官方 Claude Code 放行）、`skip_zero`（`persona_preset/inject=zero` 放行）、`error.{status,type,code,message}`、`needles[]`、`fingerprints[]`、`structure.{min_max_tokens,require_no_tools,require_single_turn}`。默认针含 `Memory-stage-one extractor` / `MUST distill reusable` 等收割包装，**不含** `Persistable response items`（普通 agent 信封）。仅 admin。
 
 ## 拒答缓存
 

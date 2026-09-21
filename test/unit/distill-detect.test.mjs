@@ -50,7 +50,29 @@ test('prompt template needles are blocked without waiting for structure', () => 
   )
 })
 
-test('openai chat persistable envelope matches 1.2.1 and is not distill', () => {
+test('openai chat persistable envelope without harvest is not distill', () => {
+  const hit = detectDistill({
+    inbound: {
+      model: 'claude-opus-5',
+      max_tokens: 4096,
+      stream: true,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: 'thread_id: abc\n\nPersistable response items (JSON):\n[{"role":"user","text":"ui显示效果追加"}]',
+            },
+          ],
+        },
+      ],
+    },
+  })
+  assert.equal(hit.action, 'pass')
+})
+
+test('memory-stage-one harvest is distill even at 4096 tokens', () => {
   const hit = detectDistill({
     inbound: {
       model: 'claude-opus-5',
@@ -74,15 +96,17 @@ test('openai chat persistable envelope matches 1.2.1 and is not distill', () => 
       ],
     },
   })
-  assert.equal(hit.action, 'pass')
+  assert.equal(hit.action, 'block')
+  assert.equal(hit.error.code, ErrorCode.DISTILL_BLOCKED)
+  assert.ok(hit.hits.some((item) => /memory-stage-one|must distill|durable rollout|must extract/i.test(item.evidence)))
 })
 
-test('default needles do not include persistable envelope or harvest wrapper phrases', () => {
+test('default needles include harvest wrappers but not persistable envelope', () => {
   const joined = DEFAULT_DISTILL_RULES.needles.join('\n')
   assert.equal(/persistable response items/i.test(joined), false)
-  assert.equal(/memory-stage-one/i.test(joined), false)
-  assert.equal(/must distill reusable/i.test(joined), false)
-  assert.equal(/must extract durable memory/i.test(joined), false)
+  assert.equal(/memory-stage-one/i.test(joined), true)
+  assert.equal(/must distill reusable/i.test(joined), true)
+  assert.equal(/must extract durable memory/i.test(joined), true)
 })
 
 test('plain cluster VM email UI prompt is not distill', () => {

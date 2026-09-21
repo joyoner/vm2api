@@ -14,6 +14,17 @@ export const DISTILL_BLOCK_MESSAGE = '不允许蒸馏'
 const HIGH_EFFORT = new Set(['high', 'xhigh', 'max'])
 const CONTEST_RE = /prove that|\\boxed|\baime\b|olympiad|\bgpqa\b|which of the following|livecodebench|amc[_\s-]?aime/i
 
+/** Transport wrapper used by normal agent sessions. Not a harvest needle. */
+export const ENVELOPE_NEEDLES = Object.freeze(['Persistable response items'])
+
+/** Memory-extractor / rollout-harvest wrappers. These are distill, even at 4096 tokens. */
+export const HARVEST_NEEDLES = Object.freeze([
+  'Memory-stage-one extractor',
+  'MUST distill reusable',
+  'MUST extract durable memory',
+  'durable rollout knowledge',
+])
+
 export const DEFAULT_DISTILL_RULES = {
   enabled: true,
   skip_official: true,
@@ -42,6 +53,7 @@ export const DEFAULT_DISTILL_RULES = {
     'as an internal monologue',
     'Please reason step by step, and put your final answer within \\boxed{}',
     'Respond in the following format: <think>',
+    ...HARVEST_NEEDLES,
   ],
   fingerprints: [
     'Let  $a,b,A,B$  be given reals. We consider the function defined by',
@@ -53,9 +65,6 @@ export const DEFAULT_DISTILL_RULES = {
     'What is the area, in square units, of an isosceles right triangle with a hypotenuse of 20 units?',
   ],
 }
-
-/** Transport wrapper used by normal agent sessions. Not a distill needle. */
-export const ENVELOPE_NEEDLES = Object.freeze(['Persistable response items'])
 
 const DEFAULT_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../config/distill-rules.json')
 
